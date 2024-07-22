@@ -1,6 +1,11 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand } from "@aws-sdk/lib-dynamodb";
+import {
+  DynamoDBDocumentClient,
+  GetCommand,
+  ScanCommand,
+} from "@aws-sdk/lib-dynamodb";
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
+import { Bank } from "../domain/Bank";
 
 const dynamoDbClient = DynamoDBDocumentClient.from(
   new DynamoDBClient({
@@ -18,21 +23,22 @@ const lambdaClient = new LambdaClient({
   // }),
 });
 
-export const getTransactionFromDynamoDb = async (
-  transactionId: string,
-  customerId: string
-) => {
-  const { Item } = await dynamoDbClient.send(
-    new GetCommand({
+export const getTransactionFromDynamoDb = async (transactionId: string) => {
+  const { Items } = await dynamoDbClient.send(
+    new ScanCommand({
       TableName: "TransactionsDbDev",
-      Key: {
-        id: transactionId,
-        customerId: customerId,
+      FilterExpression: "id = :id",
+      ExpressionAttributeValues: {
+        ":id": transactionId,
       },
     })
   );
 
-  return Item;
+  if (!Items) {
+    return [];
+  }
+
+  return Items[0] as any;
 };
 
 export const getFundFromDynamoDb = async (fundId: string) => {
@@ -46,6 +52,42 @@ export const getFundFromDynamoDb = async (fundId: string) => {
   );
 
   return Item;
+};
+
+export const getBankFromLambda = async (bankId: string) => {
+  if (bankId === "0") {
+    return new Bank({
+      id: "0",
+      name: "Otros Bancos",
+    });
+  }
+
+  const { Payload } = await lambdaClient.send(
+    new InvokeCommand({
+      FunctionName: "BanksLambdaDev",
+      Payload: JSON.stringify({
+        resource: "/banks",
+        httpMethod: "GET",
+      }),
+    })
+  );
+  const result = new Bank({});
+  if (Payload) {
+    const payload = JSON.parse(Buffer.from(Payload).toString());
+    if (payload.statusCode === 200) {
+      const body = JSON.parse(payload.body);
+      const bankMatch = body.find((val: any) => val.id === bankId);
+
+      if (!bankMatch) {
+        throw new Error(`Bank with id ${bankId} not found`);
+      }
+
+      result.id = bankMatch.id;
+      result.name = bankMatch.name;
+      return result;
+    }
+  }
+  return result;
 };
 
 export const getCustomer = async (customerId: string) => {
