@@ -7,6 +7,7 @@ import {
   getAccountFromLambda,
   getClientFromLambda,
   getTransactionByStartAndEndDate,
+  makeCustomersCsv,
 } from "./repository";
 
 import { getDateAsString, getHourAsString, currency } from "./util";
@@ -48,7 +49,11 @@ const takeScreenshot = async (name: string, html: string) => {
 // Obtener datos desde la base de datos
 const getData = async (
   transactionId: string
-): Promise<{ html: string; name: string }> => {
+): Promise<{
+  html: string;
+  name: string;
+  data: createBuyTemplateType | createSellTemplateType;
+}> => {
   const transaction = await getTransactionFromDynamoDb(transactionId);
   const customer = new Customer(await getCustomer(transaction.customerId));
   const fund = new Fund(await getFundFromDynamoDb(transaction?.fund.id));
@@ -70,6 +75,7 @@ const getData = async (
         return {
           html: createBuyTemplate(data),
           name: `${customer.identityDocuments[0].number}-${transaction.creationDate}`,
+          data,
         };
       }
 
@@ -100,6 +106,7 @@ const getData = async (
         return {
           html: createSellTemplate(data),
           name: `${customer.identityDocuments[0].number}-${transaction.creationDate}`,
+          data,
         };
       }
       break;
@@ -122,6 +129,7 @@ const getData = async (
         return {
           html: createBuyTemplate(data),
           name: `${customer.identityDocuments[0].number}-${transaction.creationDate}`,
+          data,
         };
       }
 
@@ -146,6 +154,7 @@ const getData = async (
         return {
           html: createSellTemplate(data),
           name: `${customer.identityDocuments[0].number}-${transaction.creationDate}`,
+          data,
         };
       }
       break;
@@ -158,8 +167,9 @@ const getData = async (
 
 // Generar imagen con getData y takeScreenshot
 const generateImage = async (transactionId: string) => {
-  const data = await getData(transactionId);
-  await takeScreenshot(data.name, data.html);
+  const { data, html, name } = await getData(transactionId);
+  await takeScreenshot(name, html);
+  /* await makeCustomersCsv({customers: data, transactionId}); */
 };
 
 const main = async ({

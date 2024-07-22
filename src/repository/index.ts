@@ -55,26 +55,34 @@ export const getTransactionByStartAndEndDate = async ({
 }) => {
   const startDateNumber = new Date(startDate).getTime();
   const endDateNumber = new Date(endDate).getTime();
+  const response = [];
+  let lastEvaluatedKey: Record<string, any> | undefined;
 
-  const { Items, LastEvaluatedKey } = await dynamoDbClient.send(
-    new ScanCommand({
-      TableName: "TransactionsDbDev",
-      FilterExpression: "creationDate BETWEEN :startDate and :endDate",
-      ExpressionAttributeValues: {
-        ":startDate": startDateNumber,
-        ":endDate": endDateNumber,
-      },
-      /* ExclusiveStartKey: lastEvaluatedKey, */
-    })
-  );
+  do {
+    const { Items, LastEvaluatedKey } = await dynamoDbClient.send(
+      new ScanCommand({
+        TableName: "TransactionsDbDev",
+        FilterExpression: "creationDate BETWEEN :startDate and :endDate",
+        ExpressionAttributeValues: {
+          ":startDate": startDateNumber,
+          ":endDate": endDateNumber,
+        },
+        ExclusiveStartKey: lastEvaluatedKey,
+      })
+    );
 
-  if (!Items) {
-    return [];
-  }
+    if (Items && Items.length > 0) {
+      response.push(
+        ...Items.map((item) => ({
+          id: item.id,
+        }))
+      );
+    }
 
-  return Items.map((item) => ({
-    id: item.id,
-  }));
+    lastEvaluatedKey = LastEvaluatedKey;
+  } while (lastEvaluatedKey);
+
+  return response;
 };
 
 export const getFundFromDynamoDb = async (fundId: string) => {
@@ -216,39 +224,39 @@ export const getCustomer = async (customerId: string) => {
   return customer;
 };
 
-// export const makeCustomersCsv = async ({
-//   customers,
-//   path,
-// }: {
-//   customers: Customer[];
-//   path: string;
-// }) => {
-//   const headers = [
-//     "Blum Customer Id",
-//     "Usuario",
-//     "Documento de identidad",
-//     "Tipo de usuario",
-//     "Perfil de Riesgo",
-//     "Status",
-//   ];
+export const makeCustomersCsv = async ({
+  customers,
+  path,
+}: {
+  customers: Customer[];
+  path: string;
+}) => {
+  const headers = [
+    "Blum Transaction Id",
+    "Blum Customer Id",
+    "Nombre Usuario",
+    "Tipo de usuario",
+    "DNI",
+    "Archivo",
+  ];
 
-//   const csvContent = customers.map((t) => [
-//     // t.id,
-//     // `${t.name || ""} ${t.middleName || ""} ${t.lastName || ""} ${
-//     //   t.motherLastName || ""
-//     // }`,
-//     // `${t?.identityDocuments?.[0]?.type || ""} ${
-//     //   t.identityDocuments?.[0]?.number || ""
-//     // }`,
-//     // t.type === "INDIVIDUAL" ? "Natural" : "Jurídico",
-//     // t.riskProfile,
-//     // t.status,
-//   ]);
+  const csvContent = customers.map((t) => [
+    // t.id,
+    // `${t.name || ""} ${t.middleName || ""} ${t.lastName || ""} ${
+    //   t.motherLastName || ""
+    // }`,
+    // `${t?.identityDocuments?.[0]?.type || ""} ${
+    //   t.identityDocuments?.[0]?.number || ""
+    // }`,
+    // t.type === "INDIVIDUAL" ? "Natural" : "Jurídico",
+    // t.riskProfile,
+    // t.status,
+  ]);
 
-//   await fs.writeFile(
-//     path,
-//     encode1252([headers, ...csvContent].map((row) => row.join(",")).join("\n")),
-//     { encoding: "binary" }
-//   );
-//   /* console.log(OK, "Customers report generated"); */
-// };
+  // await fs.writeFile(
+  //   path,
+  //   encode1252([headers, ...csvContent].map((row) => row.join(",")).join("\n")),
+  //   { encoding: "binary" }
+  // );
+  /* console.log(OK, "Customers report generated"); */
+};
