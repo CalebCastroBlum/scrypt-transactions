@@ -26,6 +26,7 @@ import { Account } from "./domain/Account";
 import * as path from "path";
 import * as fs from "fs";
 
+// Tomar screenshot
 const takeScreenshot = async (name: string, html: string) => {
   const screenshotDir = path.resolve("./images");
 
@@ -44,6 +45,7 @@ const takeScreenshot = async (name: string, html: string) => {
   await browser.close();
 };
 
+// Obtener datos desde la base de datos
 const getData = async (
   transactionId: string
 ): Promise<{ html: string; name: string }> => {
@@ -154,18 +156,32 @@ const getData = async (
   }
 };
 
+// Generar imagen con getData y takeScreenshot
 const generateImage = async (transactionId: string) => {
   const data = await getData(transactionId);
   await takeScreenshot(data.name, data.html);
 };
 
-getTransactionByStartAndEndDate({
-  startDate: "2024-07-01",
-  endDate: "2024-07-31",
-}).then((transactions) => {
+const main = async ({
+  startDate,
+  endDate,
+}: {
+  startDate: string;
+  endDate: string;
+}) => {
+  const transactions = await getTransactionByStartAndEndDate({
+    startDate,
+    endDate,
+  });
+
   transactions.map((t) => {
     generateImage(t.id);
   });
+};
+
+main({
+  startDate: "2024-07-01",
+  endDate: "2024-07-31",
 });
 
 /// email customer
