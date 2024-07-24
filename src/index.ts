@@ -8,6 +8,7 @@ import {
   getClientFromLambda,
   getTransactionByStartAndEndDate,
   makeCustomersCsv,
+  makeCustomerPDF,
 } from "./repository";
 
 import { getDateAsString, getHourAsString, currency } from "./util";
@@ -76,7 +77,8 @@ const getData = async (
             customer.lastName ?? ""
           } ${customer.motherLastName ?? ""} `,
           CUSTOMER_TYPE: customer.type,
-          DOCUMENT: customer.identityDocuments[0].number,
+          DOCUMENT_NUMBER: customer.identityDocuments[0].number,
+          DOCUMENT_TYPE: customer.identityDocuments[0].type,
         } as createBuyTemplateType;
         return {
           html: createBuyTemplate(data),
@@ -112,7 +114,8 @@ const getData = async (
             customer.lastName ?? ""
           } ${customer.motherLastName ?? ""} `,
           CUSTOMER_TYPE: customer.type,
-          DOCUMENT: customer.identityDocuments[0].number,
+          DOCUMENT_NUMBER: customer.identityDocuments[0].number,
+          DOCUMENT_TYPE: customer.identityDocuments[0].type,
         } as createSellTemplateType;
 
         return {
@@ -140,7 +143,8 @@ const getData = async (
             customer.lastName ?? ""
           } ${customer.motherLastName ?? ""} `,
           CUSTOMER_TYPE: customer.type,
-          DOCUMENT: customer.identityDocuments[0].number,
+          DOCUMENT_NUMBER: customer.identityDocuments[0].number,
+          DOCUMENT_TYPE: customer.identityDocuments[0].type,
         } as createBuyTemplateType;
 
         return {
@@ -172,7 +176,8 @@ const getData = async (
             customer.lastName ?? ""
           } ${customer.motherLastName ?? ""} `,
           CUSTOMER_TYPE: customer.type,
-          DOCUMENT: customer.identityDocuments[0].number,
+          DOCUMENT_NUMBER: customer.identityDocuments[0].number,
+          DOCUMENT_TYPE: customer.identityDocuments[0].type,
         } as createSellTemplateType;
         return {
           html: createSellTemplate(data),
@@ -188,13 +193,6 @@ const getData = async (
   }
 };
 
-// Generar imagen con getData y takeScreenshot
-const generateImage = async (transactionId: string) => {
-  const { data, html, archive } = await getData(transactionId);
-  await takeScreenshot(archive, html);
-  /* await makeCustomersCsv({customers: data, transactionId}); */
-};
-
 const main = async ({
   startDate,
   endDate,
@@ -202,15 +200,49 @@ const main = async ({
   startDate: string;
   endDate: string;
 }) => {
-  const transactions = await getTransactionByStartAndEndDate({
-    startDate,
-    endDate,
-  });
+  // const transactions = await getTransactionByStartAndEndDate({
+  //   startDate,
+  //   endDate,
+  // });
+
+  const data = [
+    {
+      transactionId: "9228f0d1-d530-4bd9-8438-f566991b18a6",
+    },
+    {
+      transactionId: "9352c49a-f397-408a-9a85-a8d99ae1e69d",
+    },
+    {
+      transactionId: "989f7aef-1848-4e83-85b6-22bd5ad76b3e",
+    },
+    {
+      transactionId: "9aa5bd95-dcb4-4f10-ad69-1bc2a98b21f6",
+    },
+  ];
+
+  const transactions = await Promise.all(
+    data.map(async (t) => {
+      const response = await getTransactionFromDynamoDb(t.transactionId);
+      return {
+        ...response,
+        transactionId: response.id,
+        typeTransaction: response.type,
+        customerId: response.customerId,
+      };
+    })
+  );
 
   const transactionsWithData = await Promise.all(
     transactions.map(async (t) => {
       const { data, html, archive } = await getData(t.transactionId);
-      return { ...t, ...data, archive, html };
+      await takeScreenshot(archive, html);
+      return {
+        ...t,
+        ...data,
+        archive,
+        html,
+        emailBlum: "Blum <noreply@miblum.com>",
+      };
     })
   );
 
@@ -218,13 +250,15 @@ const main = async ({
     transactions: transactionsWithData,
     path: "output.csv",
   });
+
+  await makeCustomerPDF({
+    transactions: transactionsWithData,
+    path: "output.pdf",
+  });
+  console.log("Done");
 };
 
 main({
   startDate: "2024-07-01",
   endDate: "2024-07-31",
 });
-
-/// email customer
-/// email blum
-/// fecha envío correo

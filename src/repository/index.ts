@@ -11,6 +11,8 @@ import { Customer } from "../domain/Customer";
 import { Account } from "../domain/Account";
 import { Client } from "../domain/Client";
 import { createObjectCsvWriter } from "csv-writer";
+import * as PDFDocument from "pdfkit";
+import * as fs from "fs";
 
 const dynamoDbClient = DynamoDBDocumentClient.from(
   new DynamoDBClient({
@@ -242,23 +244,56 @@ export const makeCustomersCsv = async ({
       { id: "nombre", title: "Customer Name" },
       { id: "type", title: "Customer Type" },
       { id: "email", title: "Correo Electrónico" },
-      { id: "document", title: "DNI" },
+      { id: "document_type", title: "Tipo Documento" },
+      { id: "document_number", title: "Número Documento" },
       { id: "archive", title: "Archivo" },
     ],
   });
 
   const records = transactions.map((t: any) => ({
     transactionId: t.transactionId,
-    typeTransaction: t.typeTransaction,
+    typeTransaction: `${t.typeTransaction} ${t.SUBTYPE ?? ""}`,
     customerId: t.customerId,
     nombre: t.FULL_NAME,
     type: t.CUSTOMER_TYPE,
     email: t.EMAIL,
-    document: t.DOCUMENT,
+    document_type: t.DOCUMENT_TYPE,
+    document_number: t.DOCUMENT_NUMBER,
     archive: t.archive,
   }));
 
-  csvWriter.writeRecords(records).then(() => {
-    console.log("...Done");
+  csvWriter.writeRecords(records);
+};
+
+export const makeCustomerPDF = async ({
+  transactions,
+  path,
+}: {
+  transactions: any;
+  path: string;
+}) => {
+  const doc = new PDFDocument({ size: "A4", margin: 50 });
+  doc.pipe(fs.createWriteStream(path));
+
+  transactions.forEach((t: any) => {
+    const imagePath = `images/${t.archive}`;
+    if (fs.existsSync(imagePath)) {
+      doc.fontSize(14);
+      doc.text(`${t.FULL_NAME}`, 50, 50, {
+        height: 100,
+      });
+      doc.text(`${t.DOCUMENT_TYPE} ${t.DOCUMENT_NUMBER}`, 50, 30);
+      doc.fontSize(9);
+      doc.text(`TransactionId: ${t.transactionId}`, 50, 70);
+      doc
+        .image(imagePath, 50, 170, { width: 500 })
+        .text(`Para: ${t.EMAIL}`, 50, 90)
+        .text(`De: ${t.emailBlum}`, 50, 110)
+        .text(`Fecha correo: ${t.DATE} ${t.HOUR ?? t.TIME}`, 50, 130)
+        .text(`CustomerId: ${t.customerId}`, 50, 150);
+      doc.addPage();
+    }
   });
+
+  doc.end();
 };
