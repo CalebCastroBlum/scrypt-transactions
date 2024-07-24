@@ -1,5 +1,2 @@
 Transaction Id,Transaction Type,Customer Id,Customer Name,Customer Type,Correo Electrónico,Tipo Documento,Número Documento,Archivo
-9228f0d1-d530-4bd9-8438-f566991b18a6,SELL PARTIAL,692fa6df-8908-4d80-987d-8f5ff1745839,luis  isasi oyolo ,INDIVIDUAL,luis16isasi@gmail.com,DNI,75454166,75454166_1708444879137.png
-9352c49a-f397-408a-9a85-a8d99ae1e69d,BUY ,692fa6df-8908-4d80-987d-8f5ff1745839,luis  isasi oyolo ,INDIVIDUAL,luis16isasi@gmail.com,DNI,75454166,75454166_1706664868003.png
-989f7aef-1848-4e83-85b6-22bd5ad76b3e,BUY ,692fa6df-8908-4d80-987d-8f5ff1745839,luis  isasi oyolo ,INDIVIDUAL,luis16isasi@gmail.com,DNI,75454166,75454166_1717013447445.png
-9aa5bd95-dcb4-4f10-ad69-1bc2a98b21f6,SELL PARTIAL,692fa6df-8908-4d80-987d-8f5ff1745839,luis  isasi oyolo ,INDIVIDUAL,luis16isasi@gmail.com,DNI,75454166,75454166_1708446046521.png
+34f5d550-2f87-11ed-b8ba-1f2b61e97365,BUY ,1b2a57ad-7ea6-4bc4-8c33-5b5bf2741afd,Alessandra  Rey Nassano ,INDIVIDUAL,arey@salkantay.vc,DNI,73676731,73676731_1662649319558.png

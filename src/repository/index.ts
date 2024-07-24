@@ -5,7 +5,7 @@ import {
   ScanCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
-// import { fromIni } from "@aws-sdk/credential-providers";
+import { fromIni } from "@aws-sdk/credential-providers";
 import { Bank } from "../domain/Bank";
 import { Customer } from "../domain/Customer";
 import { Account } from "../domain/Account";
@@ -13,39 +13,67 @@ import { Client } from "../domain/Client";
 import { createObjectCsvWriter } from "csv-writer";
 import * as PDFDocument from "pdfkit";
 import * as fs from "fs";
+import { ENV } from "../index";
 
 const dynamoDbClient = DynamoDBDocumentClient.from(
   new DynamoDBClient({
     region: "us-east-2",
-    // credentials: fromIni({
-    //  profile: "admin",
-    // }),
+    credentials: fromIni({
+      profile: "admin",
+    }),
   })
 );
 
 const lambdaClient = new LambdaClient({
   region: "us-east-2",
-  //credentials: fromIni({
-  //  profile: "admin",
-  // }),
+  credentials: fromIni({
+    profile: "admin",
+  }),
 });
 
-export const getTransactionFromDynamoDb = async (transactionId: string) => {
-  const { Items } = await dynamoDbClient.send(
-    new ScanCommand({
-      TableName: "TransactionsDbDev",
-      FilterExpression: "id = :id",
-      ExpressionAttributeValues: {
-        ":id": transactionId,
+export const getTransactionDb = async ({
+  customerId,
+  transactionId,
+}: {
+  transactionId: string;
+  customerId: string;
+}) => {
+  console.log({ transactionId });
+  const { Item } = await dynamoDbClient.send(
+    new GetCommand({
+      TableName: `TransactionsDb${ENV}`,
+      Key: {
+        id: transactionId,
+        customerId,
       },
     })
   );
 
-  if (!Items) {
-    return [];
-  }
+  return Item as any;
+};
 
-  return Items[0] as any;
+export const getTransactionFromDynamoDb = async (transactionId: string) => {
+  try {
+    console.log({ transactionId });
+    const { Items } = await dynamoDbClient.send(
+      new ScanCommand({
+        TableName: `TransactionsDb${ENV}`,
+        ExpressionAttributeValues: {
+          ":id": transactionId,
+        },
+        FilterExpression: "id = :id",
+      })
+    );
+    console.log({ Items });
+
+    if (!Items) {
+      return [];
+    }
+
+    return Items[0] as any;
+  } catch (error) {
+    console.log({ error });
+  }
 };
 
 export const getTransactionByStartAndEndDate = async ({
@@ -63,7 +91,7 @@ export const getTransactionByStartAndEndDate = async ({
   do {
     const { Items, LastEvaluatedKey } = await dynamoDbClient.send(
       new ScanCommand({
-        TableName: "TransactionsDbDev",
+        TableName: `TransactionsDb${ENV}`,
         FilterExpression: "creationDate BETWEEN :startDate and :endDate",
         ExpressionAttributeValues: {
           ":startDate": startDateNumber,
@@ -76,6 +104,7 @@ export const getTransactionByStartAndEndDate = async ({
     if (Items && Items.length > 0) {
       response.push(
         ...Items.map((item) => ({
+          ...item,
           transactionId: item.id,
           typeTransaction: item.type,
           customerId: item.customerId,
@@ -92,7 +121,7 @@ export const getTransactionByStartAndEndDate = async ({
 export const getFundFromDynamoDb = async (fundId: string) => {
   const { Item } = await dynamoDbClient.send(
     new GetCommand({
-      TableName: "FundsDbDev",
+      TableName: `FundsDb${ENV}`,
       Key: {
         id: fundId,
       },
@@ -112,7 +141,7 @@ export const getBankFromLambda = async (bankId: string) => {
 
   const { Payload } = await lambdaClient.send(
     new InvokeCommand({
-      FunctionName: "BanksLambdaDev",
+      FunctionName: `BanksLambda${ENV}`,
       Payload: JSON.stringify({
         resource: "/banks",
         httpMethod: "GET",
@@ -144,7 +173,7 @@ export const getAccountFromLambda = async (
 ) => {
   const { Payload } = await lambdaClient.send(
     new InvokeCommand({
-      FunctionName: "AccountsLambdaDev",
+      FunctionName: `AccountsLambda${ENV}`,
       Payload: JSON.stringify({
         resource: "/customers/{customerId}/accounts/{accountId}",
         httpMethod: "GET",
@@ -174,7 +203,7 @@ export const getAccountFromLambda = async (
 export const getClientFromLambda = async (clientId: string) => {
   const { Payload } = await lambdaClient.send(
     new InvokeCommand({
-      FunctionName: "SecurityLambdaDev",
+      FunctionName: `SecurityLambda${ENV}`,
       Payload: JSON.stringify({
         httpMethod: "GET",
         resource: "/clients/{clientId}",
@@ -200,7 +229,7 @@ export const getClientFromLambda = async (clientId: string) => {
 export const getCustomer = async (customerId: string) => {
   const { Payload } = await lambdaClient.send(
     new InvokeCommand({
-      FunctionName: `CustomersLambdaDev`,
+      FunctionName: `CustomersLambda${ENV}`,
       Payload: Buffer.from(
         JSON.stringify({
           httpMethod: "GET",
@@ -279,18 +308,18 @@ export const makeCustomerPDF = async ({
     const imagePath = `images/${t.archive}`;
     if (fs.existsSync(imagePath)) {
       doc.fontSize(14);
+      doc.text(`${t.DOCUMENT_TYPE} ${t.DOCUMENT_NUMBER}`, 50, 30);
       doc.text(`${t.FULL_NAME}`, 50, 50, {
         height: 100,
       });
-      doc.text(`${t.DOCUMENT_TYPE} ${t.DOCUMENT_NUMBER}`, 50, 30);
       doc.fontSize(9);
-      doc.text(`TransactionId: ${t.transactionId}`, 50, 70);
+      doc.text(`TransactionId: ${t.transactionId}`, 50, 90);
       doc
-        .image(imagePath, 50, 170, { width: 500 })
-        .text(`Para: ${t.EMAIL}`, 50, 90)
-        .text(`De: ${t.emailBlum}`, 50, 110)
-        .text(`Fecha correo: ${t.DATE} ${t.HOUR ?? t.TIME}`, 50, 130)
-        .text(`CustomerId: ${t.customerId}`, 50, 150);
+        .image(imagePath, 50, 190, { width: 500 })
+        .text(`Para: ${t.EMAIL}`, 50, 110)
+        .text(`De: ${t.emailBlum}`, 50, 130)
+        .text(`Fecha correo: ${t.DATE} ${t.HOUR ?? t.TIME}`, 50, 150)
+        .text(`CustomerId: ${t.customerId}`, 50, 170);
       doc.addPage();
     }
   });
