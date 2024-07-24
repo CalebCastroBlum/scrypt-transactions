@@ -1,11 +1,15 @@
 export type createBuyTemplateType = {
-  NAME: string;
+  FULL_NAME: string;
   FUND_NAME: string;
   AMOUNT: string;
   DATE: string;
   HOUR: string;
   BANK_NAME: string;
   TRANSACTION_ID: string;
+  EMAIL: string;
+  NAME: string;
+  CUSTOMER_TYPE: string;
+  DOCUMENT: string;
 };
 
 export const createBuyTemplate = (data: createBuyTemplateType) => {
@@ -13,7 +17,7 @@ export const createBuyTemplate = (data: createBuyTemplateType) => {
 };
 
 export type createSellTemplateType = {
-  NAME: string;
+  FULL_NAME: string;
   FUND_NAME: string;
   SUBTYPE: string;
   AMOUNT: string;
@@ -23,6 +27,10 @@ export type createSellTemplateType = {
   BANK_NAME: string;
   ACCOUNT: string;
   SETTLEMENT_DATE: string;
+  EMAIL: string;
+  NAME: string;
+  CUSTOMER_TYPE: string;
+  DOCUMENT: string;
 };
 
 export const createSellTemplate = (data: createSellTemplateType) => {

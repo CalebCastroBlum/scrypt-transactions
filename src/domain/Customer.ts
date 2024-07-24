@@ -11,6 +11,9 @@ export enum CustomerType {
 export class Customer {
   id: string;
   name: string;
+  middleName: string;
+  lastName: string;
+  motherLastName: string;
   type: CustomerType;
   email: string;
   identityDocuments: IdentityDocument[];

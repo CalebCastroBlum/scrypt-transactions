@@ -10,7 +10,7 @@ import { Bank } from "../domain/Bank";
 import { Customer } from "../domain/Customer";
 import { Account } from "../domain/Account";
 import { Client } from "../domain/Client";
-// import { promises as fs } from "fs";
+import { createObjectCsvWriter } from "csv-writer";
 
 const dynamoDbClient = DynamoDBDocumentClient.from(
   new DynamoDBClient({
@@ -74,7 +74,9 @@ export const getTransactionByStartAndEndDate = async ({
     if (Items && Items.length > 0) {
       response.push(
         ...Items.map((item) => ({
-          id: item.id,
+          transactionId: item.id,
+          typeTransaction: item.type,
+          customerId: item.customerId,
         }))
       );
     }
@@ -225,38 +227,38 @@ export const getCustomer = async (customerId: string) => {
 };
 
 export const makeCustomersCsv = async ({
-  customers,
+  transactions,
   path,
 }: {
-  customers: Customer[];
+  transactions: any;
   path: string;
 }) => {
-  const headers = [
-    "Blum Transaction Id",
-    "Blum Customer Id",
-    "Nombre Usuario",
-    "Tipo de usuario",
-    "DNI",
-    "Archivo",
-  ];
+  const csvWriter = createObjectCsvWriter({
+    path,
+    header: [
+      { id: "transactionId", title: "Transaction Id" },
+      { id: "typeTransaction", title: "Transaction Type" },
+      { id: "customerId", title: "Customer Id" },
+      { id: "nombre", title: "Customer Name" },
+      { id: "type", title: "Customer Type" },
+      { id: "email", title: "Correo Electrónico" },
+      { id: "document", title: "DNI" },
+      { id: "archive", title: "Archivo" },
+    ],
+  });
 
-  const csvContent = customers.map((t) => [
-    // t.id,
-    // `${t.name || ""} ${t.middleName || ""} ${t.lastName || ""} ${
-    //   t.motherLastName || ""
-    // }`,
-    // `${t?.identityDocuments?.[0]?.type || ""} ${
-    //   t.identityDocuments?.[0]?.number || ""
-    // }`,
-    // t.type === "INDIVIDUAL" ? "Natural" : "Jurídico",
-    // t.riskProfile,
-    // t.status,
-  ]);
+  const records = transactions.map((t: any) => ({
+    transactionId: t.transactionId,
+    typeTransaction: t.typeTransaction,
+    customerId: t.customerId,
+    nombre: t.FULL_NAME,
+    type: t.CUSTOMER_TYPE,
+    email: t.EMAIL,
+    document: t.DOCUMENT,
+    archive: t.archive,
+  }));
 
-  // await fs.writeFile(
-  //   path,
-  //   encode1252([headers, ...csvContent].map((row) => row.join(",")).join("\n")),
-  //   { encoding: "binary" }
-  // );
-  /* console.log(OK, "Customers report generated"); */
+  csvWriter.writeRecords(records).then(() => {
+    console.log("...Done");
+  });
 };
