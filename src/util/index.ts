@@ -22,3 +22,13 @@ export const currency: {
   USD: "$",
   PEN: "S/.",
 };
+
+export const fundsName: { [key: string]: string } = {
+  globalGrowth: "Blum Renta Global",
+  globalCapital: "Blum Capital Global",
+  globalCash: "Blum Cash",
+  globalCashPEN: "Blum Cash Soles",
+  moneyMarketUSD: "Blum Money Market Dólares",
+  moneyMarketPEN: "Blum Money Market Soles",
+  globalBondsUSD: "Blum Bonos Globales",
+};
