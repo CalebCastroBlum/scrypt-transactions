@@ -1,14 +1,10 @@
 import puppeteer from "puppeteer";
 import {
-  getTransactionFromDynamoDb,
-  getTransactionDb,
   getCustomer,
-  getFundFromDynamoDb,
   getBankFromLambda,
   getAccountFromLambda,
   getClientFromLambda,
   getTransactionByStartAndEndDate,
-  makeCustomersCsv,
   makeCustomerPDF,
   getPivoltTransaction,
   getPivoltApiTransaction,
@@ -20,7 +16,7 @@ import {
   currency,
   fundsName,
   TransactionStatusName,
-  TransactionTypeName,
+  subTypeName,
 } from "./util";
 
 import {
@@ -134,7 +130,7 @@ const getData = async (
           FUND_NAME: fundsName[transaction.fund.id],
           DATE: getDateAsString(transaction.creationDate),
           TIME: getHourAsString(transaction.creationDate),
-          SUBTYPE: TransactionTypeName[transaction.subType],
+          SUBTYPE: subTypeName[transaction.subType],
           AMOUNT: isRescueByAmount
             ? `${currency[transaction.currency]} ${transaction.amount}`
             : "-",
@@ -230,7 +226,7 @@ const getData = async (
           FUND_NAME: fundsName[transaction.fund.id],
           DATE: getDateAsString(transaction.creationDate),
           TIME: getHourAsString(transaction.creationDate),
-          SUBTYPE: TransactionTypeName[transaction.subType],
+          SUBTYPE: subTypeName[transaction.subType],
           AMOUNT: isRescueByAmount
             ? `${currency[transaction.currency]} ${transaction.amount}`
             : "-",
@@ -264,6 +260,25 @@ const getData = async (
   }
 };
 
+async function rateLimitedMap(array: any[], mapper: any, limit: number) {
+  const result = [];
+  let enqueued = 0;
+
+  for (let i = 0; i < array.length; i++) {
+    if (i % limit === 0 && i !== 0) {
+      // Esperar 1 segundo después de cada grupo de 'limit' operaciones
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    result.push(mapper(array[i]));
+    enqueued++;
+
+    if (enqueued === array.length) {
+      // Esperar a que todas las promesas en el último grupo se resuelvan
+      return Promise.all(result);
+    }
+  }
+}
+
 const main = async ({
   startDate,
   endDate,
@@ -278,11 +293,28 @@ const main = async ({
 
   console.log("OK", `total transactions: ${transactions.length}`);
 
-  const transactionsWithData = await Promise.all(
-    transactions.map(async (transaction) => {
+  // const transactionsWithData = await Promise.all(
+  //   transactions.map(async (transaction) => {
+  //     const { data, html, archive } = await getData(transaction);
+
+  //     await takeScreenshot(archive, html);
+  //     return {
+  //       ...transaction,
+  //       ...data,
+  //       archive,
+  //       html,
+  //       emailBlum: "Blum <noreply@miblum.com>",
+  //     };
+  //   })
+  // );
+
+  const transactionsWithData = await rateLimitedMap(
+    transactions,
+    async (transaction) => {
       const { data, html, archive } = await getData(transaction);
 
       await takeScreenshot(archive, html);
+
       return {
         ...transaction,
         ...data,
@@ -290,21 +322,21 @@ const main = async ({
         html,
         emailBlum: "Blum <noreply@miblum.com>",
       };
-    })
+    },
+    10
   );
 
-  console.log("OK", `transactionsWithData`);
-
-  // await makeCustomersCsv({
-  //   transactions: transactionsWithData,
-  //   path: "output.csv",
-  // });
+  console.log("INFO", `transactionsWithData`);
 
   await makeCustomerPDF({
     transactions: transactionsWithData,
     path: "outputByPeriods.pdf",
   });
-  console.log("Done");
+
+  console.log(
+    "DONE",
+    `transactions by periods with total: ${transactions.length}`
+  );
 };
 
 main({
