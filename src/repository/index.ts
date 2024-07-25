@@ -144,7 +144,6 @@ export const getTransactionByStartAndEndDate = async ({
         TableName: `TransactionsDb${ENV}`,
         FilterExpression: `creationDate BETWEEN :startDate AND :endDate AND (#fund.#id = :fundId1 OR #fund.#id = :fundId2 OR #fund.#id = :fundId3 OR #fund.#id = :fundId4)`,
         ExpressionAttributeNames: {
-          /* "#transactionDate": "transactionDate", */
           "#fund": "fund",
           "#id": "id",
         },
@@ -174,7 +173,7 @@ export const getTransactionByStartAndEndDate = async ({
     lastEvaluatedKey = LastEvaluatedKey;
   } while (lastEvaluatedKey);
 
-  return response;
+  return response.sort((a, b) => b.creationDate - a.creationDate);
 };
 
 export const getFundFromDynamoDb = async (fundId: string) => {
@@ -422,11 +421,13 @@ export const makeCustomerPDF = async ({
         .image(imagePath, 50, 230, { width: 500 })
         .text(`Para: ${t.EMAIL}`, 50, 150)
         .text(`De: ${t.emailBlum}`, 50, 170)
-        .text(`Fecha correo: ${t.DATE} ${t.HOUR ?? t.TIME}`, 50, 190)
+        .text(`Fecha (mes/día/año): ${t.DATE} ${t.HOUR ?? t.TIME}`, 50, 190)
         .text(`CustomerId: ${t.customerId}`, 50, 210);
       doc.addPage();
     }
   });
+
+  console.log("INFO", "makeCustomerPDF");
 
   doc.end();
 };
