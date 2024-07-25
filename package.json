@@ -13,6 +13,7 @@
     "@aws-sdk/client-lambda": "^3.616.0",
     "@aws-sdk/credential-providers": "^3.617.0",
     "@aws-sdk/lib-dynamodb": "^3.616.0",
+    "axios": "^1.7.2",
     "csv-writer": "^1.6.0",
     "pdfkit": "^0.15.0",
     "puppeteer": "^22.13.1",

@@ -14,22 +14,71 @@ import { createObjectCsvWriter } from "csv-writer";
 import * as PDFDocument from "pdfkit";
 import * as fs from "fs";
 import { ENV } from "../index";
+import axios from "axios";
 
 const dynamoDbClient = DynamoDBDocumentClient.from(
   new DynamoDBClient({
     region: "us-east-2",
-    credentials: fromIni({
+    /* credentials: fromIni({
       profile: "admin",
-    }),
+    }), */
   })
 );
 
 const lambdaClient = new LambdaClient({
   region: "us-east-2",
-  credentials: fromIni({
+  /* credentials: fromIni({
     profile: "admin",
-  }),
+  }), */
 });
+
+export const getPivoltTransaction = async (transactionId: string) => {
+  const { Item } = await dynamoDbClient.send(
+    new GetCommand({
+      TableName: `PivoltTransactionsDb${ENV}`,
+      Key: {
+        transactionId,
+      },
+    })
+  );
+
+  return Item || {};
+};
+
+export const getPivoltApiTransaction = async (transactionId: string) => {
+  const {
+    data,
+  }: {
+    data: {
+      Results: {
+        TransactionId: string;
+        Amount: number;
+        Price: number;
+        Tax2: number;
+        Quantity: number;
+        TransactionTypeDetail: string;
+      }[];
+    };
+  } = await axios.get(
+    `https://salkantay.pivolt.com//api/transaction/get?TransactionId=${transactionId}`,
+    {
+      headers: {
+        Authorization: `Basic cG9ydGFsOno1SGtESkBXNDR+akpySk1ANXY1`,
+      },
+    }
+  );
+
+  const [result] = data.Results ?? [];
+
+  if (result) {
+    return {
+      pivolt: { transactionId: result.TransactionId },
+      TransactionTypeDetail: result.TransactionTypeDetail,
+    };
+  }
+
+  return null;
+};
 
 export const getTransactionDb = async ({
   customerId,
@@ -92,10 +141,19 @@ export const getTransactionByStartAndEndDate = async ({
     const { Items, LastEvaluatedKey } = await dynamoDbClient.send(
       new ScanCommand({
         TableName: `TransactionsDb${ENV}`,
-        FilterExpression: "creationDate BETWEEN :startDate and :endDate",
+        FilterExpression: `creationDate BETWEEN :startDate AND :endDate AND (#fund.#id = :fundId1 OR #fund.#id = :fundId2 OR #fund.#id = :fundId3 OR #fund.#id = :fundId4)`,
+        ExpressionAttributeNames: {
+          /* "#transactionDate": "transactionDate", */
+          "#fund": "fund",
+          "#id": "id",
+        },
         ExpressionAttributeValues: {
           ":startDate": startDateNumber,
           ":endDate": endDateNumber,
+          ":fundId1": "globalCash",
+          ":fundId2": "globalGrowth",
+          ":fundId3": "globalCapital",
+          ":fundId4": "globalCashPEN",
         },
         ExclusiveStartKey: lastEvaluatedKey,
       })
@@ -306,6 +364,13 @@ export const makeCustomerPDF = async ({
 
   transactions.forEach((t: any) => {
     const imagePath = `images/${t.archive}`;
+    let sharesOrAmount = "";
+    if (t.isRescueByAmount) {
+      sharesOrAmount = "por Monto";
+    } else if (t.isRescueByShares) {
+      sharesOrAmount = "por Cuotas";
+    }
+
     if (fs.existsSync(imagePath)) {
       doc.fontSize(14);
       doc.text(`${t.DOCUMENT_TYPE} ${t.DOCUMENT_NUMBER}`, 50, 30);
@@ -314,12 +379,20 @@ export const makeCustomerPDF = async ({
       });
       doc.fontSize(9);
       doc.text(`TransactionId: ${t.transactionId}`, 50, 90);
+      doc.text(
+        `Tipo de transacción: ${t.typeTransaction} ${t.SUBTYPE ?? ""} ${
+          t.SUBTYPE === "Parcial" ? sharesOrAmount : ""
+        }`,
+        50,
+        110
+      );
+      doc.text(`Status transacción: ${t.STATUS}`, 50, 130);
       doc
-        .image(imagePath, 50, 190, { width: 500 })
-        .text(`Para: ${t.EMAIL}`, 50, 110)
-        .text(`De: ${t.emailBlum}`, 50, 130)
-        .text(`Fecha correo: ${t.DATE} ${t.HOUR ?? t.TIME}`, 50, 150)
-        .text(`CustomerId: ${t.customerId}`, 50, 170);
+        .image(imagePath, 50, 230, { width: 500 })
+        .text(`Para: ${t.EMAIL}`, 50, 150)
+        .text(`De: ${t.emailBlum}`, 50, 170)
+        .text(`Fecha correo: ${t.DATE} ${t.HOUR ?? t.TIME}`, 50, 190)
+        .text(`CustomerId: ${t.customerId}`, 50, 210);
       doc.addPage();
     }
   });

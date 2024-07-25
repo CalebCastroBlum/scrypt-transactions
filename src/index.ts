@@ -10,6 +10,8 @@ import {
   getTransactionByStartAndEndDate,
   makeCustomersCsv,
   makeCustomerPDF,
+  getPivoltTransaction,
+  getPivoltApiTransaction,
 } from "./repository";
 
 import { getDateAsString, getHourAsString, currency } from "./util";
@@ -29,7 +31,11 @@ import { Account } from "./domain/Account";
 import * as path from "path";
 import * as fs from "fs";
 
-export const ENV: "Prod" | "Dev" = "Prod";
+export const ENV: "Prod" | "Dev" = "Dev";
+const typeTransaction = {
+  PARTIAL: "Parcial",
+  TOTAL: "Total",
+};
 
 // Tomar screenshot
 const takeScreenshot = async (archive: string, html: string) => {
@@ -80,6 +86,7 @@ const transformTransaction = async (
           CUSTOMER_TYPE: customer.type,
           DOCUMENT_NUMBER: customer.identityDocuments[0].number,
           DOCUMENT_TYPE: customer.identityDocuments[0].type,
+          STATUS: transaction.status,
         } as createBuyTemplateType;
         return {
           html: createBuyTemplate(data),
@@ -90,6 +97,29 @@ const transformTransaction = async (
 
       if (transaction.type === TransactionType.SELL) {
         let account: Account;
+        let isRescueByAmount: boolean = false;
+        let isRescueByShares: boolean = false;
+        let isRescueTotal: boolean = false;
+
+        if (transaction.subType === "PARTIAL") {
+          let pivolt = await getPivoltTransaction(transaction.transactionId);
+          let pivoltData = await getPivoltApiTransaction(pivolt.pivoltId);
+          switch (pivoltData.TransactionTypeDetail) {
+            case "Redemption_Shares": {
+              isRescueByShares = true;
+              break;
+            }
+            case "Redemption_Full": {
+              isRescueTotal = true;
+              break;
+            }
+            case "Redemption_NetAmount": {
+              isRescueByAmount = true;
+              break;
+            }
+          }
+        }
+
         if (!transaction.clientId) {
           account = await getAccountFromLambda(
             transaction.destiny.account.id,
@@ -102,10 +132,12 @@ const transformTransaction = async (
           FUND_NAME: fund.name,
           DATE: getDateAsString(transaction.creationDate),
           TIME: getHourAsString(transaction.creationDate),
-          SUBTYPE: transaction.subType,
-          AMOUNT: `${currency[transaction.currency]} ${transaction.amount}`,
+          SUBTYPE: typeTransaction[transaction.subType],
+          AMOUNT: isRescueByAmount
+            ? `${currency[transaction.currency]} ${transaction.amount}`
+            : "-",
           ACCOUNT: transaction.clientId ? " - " : account.number,
-          SHARES: "-",
+          SHARES: isRescueByShares ? transaction.shares : "-",
           SETTLEMENT_DATE: getDateAsString(transaction.settlementDate),
           BANK_NAME: transaction.clientId
             ? new Client(await getClientFromLambda(transaction.clientId)).name
@@ -117,6 +149,10 @@ const transformTransaction = async (
           CUSTOMER_TYPE: customer.type,
           DOCUMENT_NUMBER: customer.identityDocuments[0].number,
           DOCUMENT_TYPE: customer.identityDocuments[0].type,
+          STATUS: transaction.status,
+          isRescueByAmount,
+          isRescueByShares,
+          isRescueTotal,
         } as createSellTemplateType;
 
         return {
@@ -146,6 +182,7 @@ const transformTransaction = async (
           CUSTOMER_TYPE: customer.type,
           DOCUMENT_NUMBER: customer.identityDocuments[0].number,
           DOCUMENT_TYPE: customer.identityDocuments[0].type,
+          STATUS: transaction.status,
         } as createBuyTemplateType;
 
         return {
@@ -156,22 +193,47 @@ const transformTransaction = async (
       }
 
       if (transaction.type === TransactionType.SELL) {
+        let isRescueByAmount: boolean = false;
+        let isRescueByShares: boolean = false;
+        let isRescueTotal: boolean = false;
+        if (transaction.subType === "PARTIAL") {
+          let pivolt = await getPivoltTransaction(transaction.transactionId);
+          let pivoltData = await getPivoltApiTransaction(pivolt.pivoltId);
+          switch (pivoltData.TransactionTypeDetail) {
+            case "Redemption_Shares": {
+              isRescueByShares = true;
+              break;
+            }
+            case "Redemption_Full": {
+              isRescueTotal = true;
+              break;
+            }
+            case "Redemption_NetAmount": {
+              isRescueByAmount = true;
+              break;
+            }
+          }
+        }
         const account = await getAccountFromLambda(
           transaction.destiny.account.id,
           customer
         );
+
+        console.log("SETTLEMENT_DATE", { date: transaction.settlementDate });
 
         const data = {
           NAME: customer.name,
           FUND_NAME: fund.name,
           DATE: getDateAsString(transaction.creationDate),
           TIME: getHourAsString(transaction.creationDate),
-          SUBTYPE: transaction.subType,
-          AMOUNT: `${currency[transaction.currency]} ${transaction.amount}`,
+          SUBTYPE: typeTransaction[transaction.subType],
+          AMOUNT: isRescueByAmount
+            ? `${currency[transaction.currency]} ${transaction.amount}`
+            : "-",
           ACCOUNT: account.number,
           SETTLEMENT_DATE: "Pendiente de aprobación",
           BANK_NAME: new Bank(await getBankFromLambda(account.bank.id)).name,
-          SHARES: "-",
+          SHARES: isRescueByShares ? transaction.shares : "-",
           EMAIL: customer.email,
           FULL_NAME: `${customer.name} ${customer.middleName ?? ""} ${
             customer.lastName ?? ""
@@ -179,6 +241,10 @@ const transformTransaction = async (
           CUSTOMER_TYPE: customer.type,
           DOCUMENT_NUMBER: customer.identityDocuments[0].number,
           DOCUMENT_TYPE: customer.identityDocuments[0].type,
+          STATUS: transaction.status,
+          isRescueByAmount,
+          isRescueByShares,
+          isRescueTotal,
         } as createSellTemplateType;
         return {
           html: createSellTemplate(data),
@@ -327,36 +393,6 @@ const main = async ({
       transactionId: "40cd1e93-e335-4513-b5bb-96cc9c9ead61",
       customerId: "c24f7bc5-a425-4759-8718-8f6c8e4d1613",
     },
-
-    // "49680a90-3a85-11ed-8246-79a1eaf8d1a3",
-    // "a84bb460-69ee-11ed-bcb9-4d00687aeb95",
-    // "d1759d00-dfc9-11ed-a634-1b94bd34603d",
-    // "8f0342d0-2fd1-11ee-bbe5-57d12244bcc1",
-    // "4957f176-a831-4561-9b3d-2ddfef6ede6a",
-    // "020ed5ff-cb2f-4034-bb79-1b4b8a29c342",
-    // "46fbb080-fbf2-11ec-8089-1d94f3f08ed8",
-    // "07fcc540-7c99-11ed-9188-2b40f67ea7e6",
-    // "73445010-86db-11ed-ba74-61b69b5412dd",
-    // "201129f0-b2f9-11ed-a6d2-e716aa88a6bb",
-    // "2143c8d0-a012-11ee-b766-4988814ce894",
-    // "595eedee-569a-4f04-b947-96c552d8709b",
-    // "aec68345-fc49-49dc-b26f-28d21fb5b0c2",
-    // "3240b120-e8f7-11ed-b2ef-894e5b2d5067",
-    // "048b5d60-0950-11ee-8742-27cdd0561edf",
-    // "fa882e90-506d-4aec-9390-d8e191e225e2",
-    // "01dc9f62-d0c2-4a25-8ec3-f0271852c99e",
-    // "724a5aa1-d78b-49f4-8599-d6e808c5b2a8",
-    // "6f2056d6-7c4e-4ace-bb6e-4e27753a4a0a",
-    // "05045170-9589-11ec-a9cc-d15fbcd39aa9",
-    // "32ebbb60-a6f9-11ec-9b2d-79ea721f0a5c",
-    // "f8bf0a60-e2cf-11ec-b4cb-9fd81f35fb91",
-    // "b1d481c0-1b6e-11ed-833b-f53ef1628bba",
-    // "eb9f4740-95ef-11ed-adf3-2dbb2935cc89",
-    // "fb566fa0-faf9-11ed-a808-69dedf86bd99",
-    // "3f4c3cd0-62ce-11ee-8f87-975747a24d48",
-    // "f3c66370-a36a-11ee-b035-ef4cf1240019",
-    // "bd97659a-b68c-42f3-8246-d97b330519d4",
-    // "40cd1e93-e335-4513-b5bb-96cc9c9ead61",
   ];
 
   const transactions = await Promise.all(
@@ -408,7 +444,7 @@ const main = async ({
   console.log("Done");
 };
 
-main({
+/* main({
   startDate: "2024-07-01",
   endDate: "2024-07-31",
-});
+}); */

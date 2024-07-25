@@ -11,6 +11,7 @@ export type createBuyTemplateType = {
   CUSTOMER_TYPE: string;
   DOCUMENT_NUMBER: string;
   DOCUMENT_TYPE: string;
+  STATUS: string;
 };
 
 export const createBuyTemplate = (data: createBuyTemplateType) => {
@@ -33,6 +34,7 @@ export type createSellTemplateType = {
   CUSTOMER_TYPE: string;
   DOCUMENT_NUMBER: string;
   DOCUMENT_TYPE: string;
+  STATUS: string;
 };
 
 export const createSellTemplate = (data: createSellTemplateType) => {

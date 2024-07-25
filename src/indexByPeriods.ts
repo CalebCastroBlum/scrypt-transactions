@@ -10,6 +10,8 @@ import {
   getTransactionByStartAndEndDate,
   makeCustomersCsv,
   makeCustomerPDF,
+  getPivoltTransaction,
+  getPivoltApiTransaction,
 } from "./repository";
 
 import { getDateAsString, getHourAsString, currency, fundsName } from "./util";
@@ -28,7 +30,10 @@ import { Account } from "./domain/Account";
 import * as path from "path";
 import * as fs from "fs";
 
-export const ENV: "Prod" | "Dev" = "Prod";
+const typeTransaction = {
+  PARTIAL: "Parcial",
+  TOTAL: "Total",
+};
 
 // Tomar screenshot
 const takeScreenshot = async (archive: string, html: string) => {
@@ -81,6 +86,7 @@ const getData = async (
           CUSTOMER_TYPE: customer.type,
           DOCUMENT_NUMBER: customer.identityDocuments[0].number,
           DOCUMENT_TYPE: customer.identityDocuments[0].type,
+          STATUS: transaction.status,
         } as createBuyTemplateType;
         return {
           html: createBuyTemplate(data),
@@ -91,6 +97,29 @@ const getData = async (
 
       if (transaction.type === TransactionType.SELL) {
         let account: Account;
+        let isRescueByAmount: boolean = false;
+        let isRescueByShares: boolean = false;
+        let isRescueTotal: boolean = false;
+
+        if (transaction.subType === "PARTIAL") {
+          let pivolt = await getPivoltTransaction(transaction.transactionId);
+          let pivoltData = await getPivoltApiTransaction(pivolt.pivoltId);
+          switch (pivoltData.TransactionTypeDetail) {
+            case "Redemption_Shares": {
+              isRescueByShares = true;
+              break;
+            }
+            case "Redemption_Full": {
+              isRescueTotal = true;
+              break;
+            }
+            case "Redemption_NetAmount": {
+              isRescueByAmount = true;
+              break;
+            }
+          }
+        }
+
         if (!transaction.clientId) {
           account = await getAccountFromLambda(
             transaction.destiny.account.id,
@@ -104,11 +133,11 @@ const getData = async (
           DATE: getDateAsString(transaction.creationDate),
           TIME: getHourAsString(transaction.creationDate),
           SUBTYPE: transaction.subType,
-          AMOUNT: `${currency[transaction.currency] || "$"} ${
-            transaction.amount
-          }`,
+          AMOUNT: isRescueByAmount
+            ? `${currency[transaction.currency]} ${transaction.amount}`
+            : "-",
           ACCOUNT: transaction.clientId ? " - " : account.number,
-          SHARES: "-",
+          SHARES: isRescueByShares ? transaction.shares : "-",
           SETTLEMENT_DATE: getDateAsString(transaction.settlementDate),
           BANK_NAME: transaction.clientId
             ? new Client(await getClientFromLambda(transaction.clientId)).name
@@ -120,6 +149,10 @@ const getData = async (
           CUSTOMER_TYPE: customer.type,
           DOCUMENT_NUMBER: customer.identityDocuments[0].number,
           DOCUMENT_TYPE: customer.identityDocuments[0].type,
+          STATUS: transaction.status,
+          isRescueByAmount,
+          isRescueByShares,
+          isRescueTotal,
         } as createSellTemplateType;
 
         return {
@@ -151,6 +184,7 @@ const getData = async (
           CUSTOMER_TYPE: customer.type,
           DOCUMENT_NUMBER: customer.identityDocuments[0].number,
           DOCUMENT_TYPE: customer.identityDocuments[0].type,
+          STATUS: transaction.status,
         } as createBuyTemplateType;
 
         return {
@@ -161,24 +195,47 @@ const getData = async (
       }
 
       if (transaction.type === TransactionType.SELL) {
+        let isRescueByAmount: boolean = false;
+        let isRescueByShares: boolean = false;
+        let isRescueTotal: boolean = false;
+        if (transaction.subType === "PARTIAL") {
+          let pivolt = await getPivoltTransaction(transaction.transactionId);
+          let pivoltData = await getPivoltApiTransaction(pivolt.pivoltId);
+          switch (pivoltData.TransactionTypeDetail) {
+            case "Redemption_Shares": {
+              isRescueByShares = true;
+              break;
+            }
+            case "Redemption_Full": {
+              isRescueTotal = true;
+              break;
+            }
+            case "Redemption_NetAmount": {
+              isRescueByAmount = true;
+              break;
+            }
+          }
+        }
         const account = await getAccountFromLambda(
           transaction.destiny.account.id,
           customer
         );
+
+        console.log("SETTLEMENT_DATE", { date: transaction.settlementDate });
 
         const data = {
           NAME: customer.name,
           FUND_NAME: fundsName[transaction.fund.id],
           DATE: getDateAsString(transaction.creationDate),
           TIME: getHourAsString(transaction.creationDate),
-          SUBTYPE: transaction.subType,
-          AMOUNT: `${currency[transaction.currency] || "$"} ${
-            transaction.amount
-          }`,
+          SUBTYPE: typeTransaction[transaction.subType],
+          AMOUNT: isRescueByAmount
+            ? `${currency[transaction.currency]} ${transaction.amount}`
+            : "-",
           ACCOUNT: account.number,
           SETTLEMENT_DATE: "Pendiente de aprobación",
           BANK_NAME: new Bank(await getBankFromLambda(account.bank.id)).name,
-          SHARES: "-",
+          SHARES: isRescueByShares ? transaction.shares : "-",
           EMAIL: customer.email,
           FULL_NAME: `${customer.name} ${customer.middleName ?? ""} ${
             customer.lastName ?? ""
@@ -186,6 +243,10 @@ const getData = async (
           CUSTOMER_TYPE: customer.type,
           DOCUMENT_NUMBER: customer.identityDocuments[0].number,
           DOCUMENT_TYPE: customer.identityDocuments[0].type,
+          STATUS: transaction.status,
+          isRescueByAmount,
+          isRescueByShares,
+          isRescueTotal,
         } as createSellTemplateType;
         return {
           html: createSellTemplate(data),
