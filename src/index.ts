@@ -31,7 +31,7 @@ import { Account } from "./domain/Account";
 import * as path from "path";
 import * as fs from "fs";
 
-export const ENV: "Prod" | "Dev" = "Dev";
+export const ENV: "Prod" | "Dev" = "Prod";
 const typeTransaction = {
   PARTIAL: "Parcial",
   TOTAL: "Total",

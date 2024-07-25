@@ -15,21 +15,22 @@ import * as PDFDocument from "pdfkit";
 import * as fs from "fs";
 import { ENV } from "../index";
 import axios from "axios";
+import { TransactionTypeName } from "../util";
 
 const dynamoDbClient = DynamoDBDocumentClient.from(
   new DynamoDBClient({
     region: "us-east-2",
-    /* credentials: fromIni({
+    credentials: fromIni({
       profile: "admin",
-    }), */
+    }),
   })
 );
 
 const lambdaClient = new LambdaClient({
   region: "us-east-2",
-  /* credentials: fromIni({
+  credentials: fromIni({
     profile: "admin",
-  }), */
+  }),
 });
 
 export const getPivoltTransaction = async (transactionId: string) => {
@@ -380,9 +381,9 @@ export const makeCustomerPDF = async ({
       doc.fontSize(9);
       doc.text(`TransactionId: ${t.transactionId}`, 50, 90);
       doc.text(
-        `Tipo de transacción: ${t.typeTransaction} ${t.SUBTYPE ?? ""} ${
-          t.SUBTYPE === "Parcial" ? sharesOrAmount : ""
-        }`,
+        `Tipo de transacción: ${TransactionTypeName[t.typeTransaction]} ${
+          t.SUBTYPE ?? ""
+        } ${t.SUBTYPE === "Parcial" ? sharesOrAmount : ""}`,
         50,
         110
       );

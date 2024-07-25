@@ -14,7 +14,14 @@ import {
   getPivoltApiTransaction,
 } from "./repository";
 
-import { getDateAsString, getHourAsString, currency, fundsName } from "./util";
+import {
+  getDateAsString,
+  getHourAsString,
+  currency,
+  fundsName,
+  TransactionStatusName,
+  TransactionTypeName,
+} from "./util";
 
 import {
   createBuyTemplate,
@@ -29,11 +36,6 @@ import { Client } from "./domain/Client";
 import { Account } from "./domain/Account";
 import * as path from "path";
 import * as fs from "fs";
-
-const typeTransaction = {
-  PARTIAL: "Parcial",
-  TOTAL: "Total",
-};
 
 // Tomar screenshot
 const takeScreenshot = async (archive: string, html: string) => {
@@ -86,7 +88,7 @@ const getData = async (
           CUSTOMER_TYPE: customer.type,
           DOCUMENT_NUMBER: customer.identityDocuments[0].number,
           DOCUMENT_TYPE: customer.identityDocuments[0].type,
-          STATUS: transaction.status,
+          STATUS: TransactionStatusName[transaction.status],
         } as createBuyTemplateType;
         return {
           html: createBuyTemplate(data),
@@ -132,7 +134,7 @@ const getData = async (
           FUND_NAME: fundsName[transaction.fund.id],
           DATE: getDateAsString(transaction.creationDate),
           TIME: getHourAsString(transaction.creationDate),
-          SUBTYPE: transaction.subType,
+          SUBTYPE: TransactionTypeName[transaction.subType],
           AMOUNT: isRescueByAmount
             ? `${currency[transaction.currency]} ${transaction.amount}`
             : "-",
@@ -149,7 +151,7 @@ const getData = async (
           CUSTOMER_TYPE: customer.type,
           DOCUMENT_NUMBER: customer.identityDocuments[0].number,
           DOCUMENT_TYPE: customer.identityDocuments[0].type,
-          STATUS: transaction.status,
+          STATUS: TransactionStatusName[transaction.status],
           isRescueByAmount,
           isRescueByShares,
           isRescueTotal,
@@ -184,7 +186,7 @@ const getData = async (
           CUSTOMER_TYPE: customer.type,
           DOCUMENT_NUMBER: customer.identityDocuments[0].number,
           DOCUMENT_TYPE: customer.identityDocuments[0].type,
-          STATUS: transaction.status,
+          STATUS: TransactionStatusName[transaction.status],
         } as createBuyTemplateType;
 
         return {
@@ -228,7 +230,7 @@ const getData = async (
           FUND_NAME: fundsName[transaction.fund.id],
           DATE: getDateAsString(transaction.creationDate),
           TIME: getHourAsString(transaction.creationDate),
-          SUBTYPE: typeTransaction[transaction.subType],
+          SUBTYPE: TransactionTypeName[transaction.subType],
           AMOUNT: isRescueByAmount
             ? `${currency[transaction.currency]} ${transaction.amount}`
             : "-",
@@ -243,7 +245,7 @@ const getData = async (
           CUSTOMER_TYPE: customer.type,
           DOCUMENT_NUMBER: customer.identityDocuments[0].number,
           DOCUMENT_TYPE: customer.identityDocuments[0].type,
-          STATUS: transaction.status,
+          STATUS: TransactionStatusName[transaction.status],
           isRescueByAmount,
           isRescueByShares,
           isRescueTotal,

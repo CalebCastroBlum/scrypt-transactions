@@ -32,3 +32,22 @@ export const fundsName: { [key: string]: string } = {
   moneyMarketPEN: "Blum Money Market Soles",
   globalBondsUSD: "Blum Bonos Globales",
 };
+
+export const TransactionTypeName: { [key: string]: string } = {
+  BUY: "Suscripción",
+  SELL: "Rescate",
+};
+
+export const subTypeName: { [key: string]: string } = {
+  PARTIAL: "Parcial",
+  TOTAL: "Total",
+};
+
+export const TransactionStatusName: { [key: string]: string } = {
+  REQUESTED: "En proceso",
+  UNCONFIRMED: "Por confirmar",
+  ON_HOLD: "Por firmar",
+  REJECTED: "Rechazado",
+  CONFIRMED: "Confirmado",
+  COMPLETED: "Completado",
+};
