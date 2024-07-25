@@ -91,6 +91,7 @@ const getData = async (
           DOCUMENT_NUMBER: customer.identityDocuments[0].number,
           DOCUMENT_TYPE: customer.identityDocuments[0].type,
           STATUS: TransactionStatusName[transaction.status],
+          SUBJECT: "Nueva suscripción Blum: pedido recibido",
         } as createBuyTemplateType;
         return {
           html: createBuyTemplate(data),
@@ -157,6 +158,7 @@ const getData = async (
           isRescueByAmount,
           isRescueByShares,
           isRescueTotal,
+          SUBJECT: "Confirmación de rescate",
         } as createSellTemplateType;
 
         return {
@@ -189,6 +191,7 @@ const getData = async (
           DOCUMENT_NUMBER: customer.identityDocuments[0].number,
           DOCUMENT_TYPE: customer.identityDocuments[0].type,
           STATUS: TransactionStatusName[transaction.status],
+          SUBJECT: "Nueva suscripción Blum: pedido recibido",
         } as createBuyTemplateType;
 
         return {
@@ -229,8 +232,6 @@ const getData = async (
           customer
         );
 
-        console.log("SETTLEMENT_DATE", { date: transaction.settlementDate });
-
         const data = {
           NAME: `${employee.name} ${employee.lastName}`,
           FUND_NAME: fundsName[transaction.fund.id],
@@ -256,6 +257,7 @@ const getData = async (
           isRescueByAmount,
           isRescueByShares,
           isRescueTotal,
+          SUBJECT: "Blum Empresas: Confirmación de rescate",
         } as confirmSellBusinessTemplateType;
 
         return {

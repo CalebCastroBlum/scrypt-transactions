@@ -12,13 +12,23 @@ import {
   makeCustomerPDF,
   getPivoltTransaction,
   getPivoltApiTransaction,
+  getEmployee,
 } from "./repository";
 
-import { getDateAsString, getHourAsString, currency } from "./util";
+import {
+  getDateAsString,
+  getHourAsString,
+  currency,
+  TransactionStatusName,
+  fundsName,
+  subTypeName,
+} from "./util";
 
 import {
+  confirmSellBusinessTemplateType,
   createBuyTemplate,
   type createBuyTemplateType,
+  createPendingSellTemplate,
   createSellTemplate,
   type createSellTemplateType,
 } from "./templates";
@@ -32,10 +42,6 @@ import * as path from "path";
 import * as fs from "fs";
 
 export const ENV: "Prod" | "Dev" = "Prod";
-const typeTransaction = {
-  PARTIAL: "Parcial",
-  TOTAL: "Total",
-};
 
 // Tomar screenshot
 const takeScreenshot = async (archive: string, html: string) => {
@@ -61,7 +67,10 @@ const transformTransaction = async (
 ): Promise<{
   html: string;
   archive: string;
-  data: createBuyTemplateType | createSellTemplateType;
+  data:
+    | createBuyTemplateType
+    | createSellTemplateType
+    | confirmSellBusinessTemplateType;
 }> => {
   const customer = new Customer(await getCustomer(transaction.customerId));
   const fund = new Fund(await getFundFromDynamoDb(transaction?.fund.id));
@@ -71,10 +80,12 @@ const transformTransaction = async (
       if (transaction.type === TransactionType.BUY) {
         const data = {
           NAME: customer.name,
-          FUND_NAME: fund.name,
+          FUND_NAME: fundsName[transaction.fund.id],
           DATE: getDateAsString(transaction.creationDate),
           HOUR: getHourAsString(transaction.creationDate),
-          AMOUNT: `${currency[transaction.currency]} ${transaction.amount}`,
+          AMOUNT: `${currency[transaction.currency] || "$"} ${
+            transaction.amount
+          }`,
           TRANSACTION_ID: transaction.origin.bank.transaction.id || "",
           BANK_NAME: new Bank(
             await getBankFromLambda(transaction.origin.bank.id)
@@ -86,7 +97,8 @@ const transformTransaction = async (
           CUSTOMER_TYPE: customer.type,
           DOCUMENT_NUMBER: customer.identityDocuments[0].number,
           DOCUMENT_TYPE: customer.identityDocuments[0].type,
-          STATUS: transaction.status,
+          STATUS: TransactionStatusName[transaction.status],
+          SUBJECT: "Nueva suscripción Blum: pedido recibido",
         } as createBuyTemplateType;
         return {
           html: createBuyTemplate(data),
@@ -129,10 +141,10 @@ const transformTransaction = async (
 
         const data = {
           NAME: customer.name,
-          FUND_NAME: fund.name,
+          FUND_NAME: fundsName[transaction.fund.id],
           DATE: getDateAsString(transaction.creationDate),
           TIME: getHourAsString(transaction.creationDate),
-          SUBTYPE: typeTransaction[transaction.subType],
+          SUBTYPE: subTypeName[transaction.subType],
           AMOUNT: isRescueByAmount
             ? `${currency[transaction.currency]} ${transaction.amount}`
             : "-",
@@ -149,10 +161,11 @@ const transformTransaction = async (
           CUSTOMER_TYPE: customer.type,
           DOCUMENT_NUMBER: customer.identityDocuments[0].number,
           DOCUMENT_TYPE: customer.identityDocuments[0].type,
-          STATUS: transaction.status,
+          STATUS: TransactionStatusName[transaction.status],
           isRescueByAmount,
           isRescueByShares,
           isRescueTotal,
+          SUBJECT: "Confirmación de rescate",
         } as createSellTemplateType;
 
         return {
@@ -167,10 +180,12 @@ const transformTransaction = async (
       if (transaction.type === TransactionType.BUY) {
         const data = {
           NAME: customer.name,
-          FUND_NAME: fund.name,
+          FUND_NAME: fundsName[transaction.fund.id],
           DATE: getDateAsString(transaction.creationDate),
           HOUR: getHourAsString(transaction.creationDate),
-          AMOUNT: `${currency[transaction.currency]} ${transaction.amount}`,
+          AMOUNT: `${currency[transaction.currency] || "$"} ${
+            transaction.amount
+          }`,
           TRANSACTION_ID: "",
           BANK_NAME: new Bank(
             await getBankFromLambda(transaction.origin.bank.id)
@@ -182,7 +197,8 @@ const transformTransaction = async (
           CUSTOMER_TYPE: customer.type,
           DOCUMENT_NUMBER: customer.identityDocuments[0].number,
           DOCUMENT_TYPE: customer.identityDocuments[0].type,
-          STATUS: transaction.status,
+          STATUS: TransactionStatusName[transaction.status],
+          SUBJECT: "Nueva suscripción Blum: pedido recibido",
         } as createBuyTemplateType;
 
         return {
@@ -214,40 +230,44 @@ const transformTransaction = async (
             }
           }
         }
+        const employee = await getEmployee({
+          employeeId: transaction.employeeId,
+          customerId: transaction.customerId,
+        });
         const account = await getAccountFromLambda(
           transaction.destiny.account.id,
           customer
         );
 
-        console.log("SETTLEMENT_DATE", { date: transaction.settlementDate });
-
         const data = {
-          NAME: customer.name,
-          FUND_NAME: fund.name,
+          NAME: `${employee.name} ${employee.lastName}`,
+          FUND_NAME: fundsName[transaction.fund.id],
           DATE: getDateAsString(transaction.creationDate),
           TIME: getHourAsString(transaction.creationDate),
-          SUBTYPE: typeTransaction[transaction.subType],
+          SUBTYPE: subTypeName[transaction.subType],
           AMOUNT: isRescueByAmount
             ? `${currency[transaction.currency]} ${transaction.amount}`
             : "-",
           ACCOUNT: account.number,
-          SETTLEMENT_DATE: "Pendiente de aprobación",
+          SETTLEMENT_DATE: getDateAsString(transaction.settlementDate),
           BANK_NAME: new Bank(await getBankFromLambda(account.bank.id)).name,
           SHARES: isRescueByShares ? transaction.shares : "-",
+          BUSINESS: customer.name,
           EMAIL: customer.email,
-          FULL_NAME: `${customer.name} ${customer.middleName ?? ""} ${
-            customer.lastName ?? ""
-          } ${customer.motherLastName ?? ""} `,
           CUSTOMER_TYPE: customer.type,
           DOCUMENT_NUMBER: customer.identityDocuments[0].number,
           DOCUMENT_TYPE: customer.identityDocuments[0].type,
-          STATUS: transaction.status,
+          STATUS: TransactionStatusName[transaction.status],
+          FULL_NAME: `${customer.name} ${customer.middleName ?? ""} ${
+            customer.lastName ?? ""
+          } ${customer.motherLastName ?? ""} `,
           isRescueByAmount,
           isRescueByShares,
           isRescueTotal,
-        } as createSellTemplateType;
+          SUBJECT: "Blum Empresas: Confirmación de rescate",
+        } as confirmSellBusinessTemplateType;
         return {
-          html: createSellTemplate(data),
+          html: createPendingSellTemplate(data),
           archive: `${customer.identityDocuments[0].number}_${transaction.creationDate}.png`,
           data,
         };

@@ -12,6 +12,7 @@ export type createBuyTemplateType = {
   DOCUMENT_NUMBER: string;
   DOCUMENT_TYPE: string;
   STATUS: string;
+  SUBJECT: string;
 };
 
 export const createBuyTemplate = (data: createBuyTemplateType) => {
@@ -35,6 +36,7 @@ export type createSellTemplateType = {
   DOCUMENT_NUMBER: string;
   DOCUMENT_TYPE: string;
   STATUS: string;
+  SUBJECT: string;
 };
 
 export const createSellTemplate = (data: createSellTemplateType) => {
@@ -57,6 +59,7 @@ export type confirmSellBusinessTemplateType = {
   DOCUMENT_NUMBER: string;
   DOCUMENT_TYPE: string;
   STATUS: string;
+  SUBJECT: string;
 };
 
 export const createPendingSellTemplate = (

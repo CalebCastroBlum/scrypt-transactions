@@ -404,9 +404,7 @@ export const makeCustomerPDF = async ({
     if (fs.existsSync(imagePath)) {
       doc.fontSize(14);
       doc.text(`${t.DOCUMENT_TYPE} ${t.DOCUMENT_NUMBER}`, 50, 30);
-      doc.text(`${t.FULL_NAME}`, 50, 50, {
-        height: 100,
-      });
+      doc.text(`${t.FULL_NAME}`, 50, 50);
       doc.fontSize(9);
       doc.text(`TransactionId: ${t.transactionId}`, 50, 90);
       doc.text(
@@ -418,11 +416,12 @@ export const makeCustomerPDF = async ({
       );
       doc.text(`Status transacción: ${t.STATUS}`, 50, 130);
       doc
-        .image(imagePath, 50, 230, { width: 500 })
-        .text(`Para: ${t.EMAIL}`, 50, 150)
-        .text(`De: ${t.emailBlum}`, 50, 170)
-        .text(`Fecha (mes/día/año): ${t.DATE} ${t.HOUR ?? t.TIME}`, 50, 190)
-        .text(`CustomerId: ${t.customerId}`, 50, 210);
+        .image(imagePath, 50, 250, { width: 500 })
+        .text(`Asunto: ${t.SUBJECT}`, 50, 150)
+        .text(`Para: ${t.EMAIL}`, 50, 170)
+        .text(`De: ${t.emailBlum}`, 50, 190)
+        .text(`Fecha (mes/día/año): ${t.DATE} ${t.HOUR ?? t.TIME}`, 50, 210)
+        .text(`CustomerId: ${t.customerId}`, 50, 230);
       doc.addPage();
     }
   });
