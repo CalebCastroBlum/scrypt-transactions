@@ -316,6 +316,36 @@ export const getCustomer = async (customerId: string) => {
   return customer;
 };
 
+export const getEmployee = async ({
+  employeeId,
+  customerId,
+}: {
+  employeeId: string;
+  customerId: string;
+}) => {
+  const { Item } = await dynamoDbClient.send(
+    new GetCommand({
+      TableName: `EmployeesDb${ENV}`,
+      Key: {
+        id: employeeId,
+        customerId: customerId,
+      },
+    })
+  );
+
+  if (!Item) {
+    throw new Error("Employee not found");
+  }
+
+  return {
+    id: Item.id,
+    name: Item.name,
+    middleName: Item.middleName,
+    lastName: Item.lastName,
+    motherLastName: Item.motherLastName,
+  };
+};
+
 export const makeCustomersCsv = async ({
   transactions,
   path,

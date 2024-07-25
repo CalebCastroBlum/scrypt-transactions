@@ -12,6 +12,7 @@ import {
   makeCustomerPDF,
   getPivoltTransaction,
   getPivoltApiTransaction,
+  getEmployee,
 } from "./repository";
 
 import {
@@ -24,8 +25,10 @@ import {
 } from "./util";
 
 import {
+  confirmSellBusinessTemplateType,
   createBuyTemplate,
   type createBuyTemplateType,
+  createPendingSellTemplate,
   createSellTemplate,
   type createSellTemplateType,
 } from "./templates";
@@ -62,7 +65,10 @@ const getData = async (
 ): Promise<{
   html: string;
   archive: string;
-  data: createBuyTemplateType | createSellTemplateType;
+  data:
+    | createBuyTemplateType
+    | createSellTemplateType
+    | confirmSellBusinessTemplateType;
 }> => {
   const customer = new Customer(await getCustomer(transaction.customerId));
 
@@ -218,6 +224,10 @@ const getData = async (
             }
           }
         }
+        const employee = await getEmployee({
+          employeeId: transaction.employeeId,
+          customerId: transaction.customerId,
+        });
         const account = await getAccountFromLambda(
           transaction.destiny.account.id,
           customer
@@ -226,7 +236,7 @@ const getData = async (
         console.log("SETTLEMENT_DATE", { date: transaction.settlementDate });
 
         const data = {
-          NAME: customer.name,
+          NAME: `${employee.name} ${employee.lastName}`,
           FUND_NAME: fundsName[transaction.fund.id],
           DATE: getDateAsString(transaction.creationDate),
           TIME: getHourAsString(transaction.creationDate),
@@ -235,23 +245,25 @@ const getData = async (
             ? `${currency[transaction.currency]} ${transaction.amount}`
             : "-",
           ACCOUNT: account.number,
-          SETTLEMENT_DATE: "Pendiente de aprobación",
+          SETTLEMENT_DATE: getDateAsString(transaction.settlementDate),
           BANK_NAME: new Bank(await getBankFromLambda(account.bank.id)).name,
           SHARES: isRescueByShares ? transaction.shares : "-",
+          BUSINESS: customer.name,
           EMAIL: customer.email,
-          FULL_NAME: `${customer.name} ${customer.middleName ?? ""} ${
-            customer.lastName ?? ""
-          } ${customer.motherLastName ?? ""} `,
           CUSTOMER_TYPE: customer.type,
           DOCUMENT_NUMBER: customer.identityDocuments[0].number,
           DOCUMENT_TYPE: customer.identityDocuments[0].type,
           STATUS: TransactionStatusName[transaction.status],
+          FULL_NAME: `${customer.name} ${customer.middleName ?? ""} ${
+            customer.lastName ?? ""
+          } ${customer.motherLastName ?? ""} `,
           isRescueByAmount,
           isRescueByShares,
           isRescueTotal,
-        } as createSellTemplateType;
+        } as confirmSellBusinessTemplateType;
+
         return {
-          html: createSellTemplate(data),
+          html: createPendingSellTemplate(data),
           archive: `${customer.identityDocuments[0].number}_${transaction.creationDate}.png`,
           data,
         };
